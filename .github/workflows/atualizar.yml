@@ -1,0 +1,29 @@
+name: Atualizar painel
+
+on:
+  schedule:
+    - cron: "0 9 1,16 * *" # dias 1 e 16, 6h em Brasília
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+jobs:
+  atualizar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      # baixa tudo porque o SISAGUA também revisa anos anteriores;
+      # se a API ou a checagem falharem, o site publicado continua o anterior
+      - run: python tools/fetch_sisagua.py --all
+      - run: python tools/build.py
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+      - uses: actions/deploy-pages@v4
