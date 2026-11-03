@@ -70,9 +70,13 @@ def classifica(parametro, resultado):
     return "alto" if valor > TURBIDEZ_MAX else "ok"
 
 
-def baixa_json(url):
-    # a API do IBGE às vezes não responde a partir dos runners do GitHub; tenta de novo como em fetch_sisagua
+def baixa_json(url, arquivo):
+    """Lê a cópia salva em tools/ (o IBGE não responde aos runners do GitHub); sem ela, baixa da API."""
+    local = RAIZ / "tools" / arquivo
     for tentativa in range(6):
+        if local.exists():
+            bruto = local.read_bytes()
+            break
         try:
             with urllib.request.urlopen(url, timeout=120) as resp:
                 bruto = resp.read()
@@ -88,7 +92,7 @@ def baixa_json(url):
 
 def mapa_svg(codigos_ibge):
     """Projeta a malha do IBGE em caminhos SVG, com a escala corrigida pela latitude de Alagoas."""
-    malha = baixa_json(IBGE_MALHA)
+    malha = baixa_json(IBGE_MALHA, "ibge_malha.json")
     pontos = []
     for f in malha["features"]:
         g = f["geometry"]
@@ -113,7 +117,7 @@ def mapa_svg(codigos_ibge):
 
 def main():
     arquivos = sorted(RAW.glob("vigilancia_al_*.csv"))
-    ibge = baixa_json(IBGE_MUNICIPIOS)
+    ibge = baixa_json(IBGE_MUNICIPIOS, "ibge_municipios.json")
     por_nome = {normaliza(m["nome"]): m for m in ibge}
     csv.field_size_limit(10**7)
 
