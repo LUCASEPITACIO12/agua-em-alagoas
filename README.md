@@ -57,14 +57,6 @@ Depois, abra `site/index.html` no navegador.
 
 O primeiro download leva de 30 a 50 minutos. Nas vezes seguintes, só os dois anos mais recentes são baixados de novo, porque o SISAGUA recebe registros com atraso. Use `python tools/fetch_sisagua.py --all` para baixar tudo outra vez.
 
-## Publicar no seu próprio GitHub
-
-1. Faça um fork ou envie esta pasta para um repositório seu.
-2. Em **Settings → Pages**, escolha **GitHub Actions** como origem.
-3. Em **Actions → Atualizar painel**, clique em **Run workflow**.
-
-A partir daí, a atualização roda sozinha duas vezes por mês.
-
 ## Fonte e tratamento dos dados
 
 **Fonte:** API [`apidadosabertos.saude.gov.br/sisagua/vigilancia-parametros-basicos`](https://apidadosabertos.saude.gov.br/sisagua/vigilancia-parametros-basicos), com 1.000 linhas por página. Para 2018, as contagens e as chaves das amostras bateram integralmente com o CSV oficial (verificado com `tools/compare_csv.py`).
