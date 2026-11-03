@@ -71,7 +71,10 @@ def classifica(parametro, resultado):
 
 
 def baixa_json(url, arquivo):
-    """Lê a cópia salva em tools/ (o IBGE não responde aos runners do GitHub); sem ela, baixa da API."""
+    """Lê a cópia salva em tools/ (o IBGE não responde aos runners do GitHub); sem ela, baixa da API.
+
+    tools/27 é a malha dos municípios e tools/municipios.json é a lista, ambos baixados do IBGE.
+    """
     local = RAIZ / "tools" / arquivo
     for tentativa in range(6):
         if local.exists():
@@ -92,7 +95,7 @@ def baixa_json(url, arquivo):
 
 def mapa_svg(codigos_ibge):
     """Projeta a malha do IBGE em caminhos SVG, com a escala corrigida pela latitude de Alagoas."""
-    malha = baixa_json(IBGE_MALHA, "ibge_malha.json")
+    malha = baixa_json(IBGE_MALHA, "27")
     pontos = []
     for f in malha["features"]:
         g = f["geometry"]
@@ -117,7 +120,7 @@ def mapa_svg(codigos_ibge):
 
 def main():
     arquivos = sorted(RAW.glob("vigilancia_al_*.csv"))
-    ibge = baixa_json(IBGE_MUNICIPIOS, "ibge_municipios.json")
+    ibge = baixa_json(IBGE_MUNICIPIOS, "municipios.json")
     por_nome = {normaliza(m["nome"]): m for m in ibge}
     csv.field_size_limit(10**7)
 
