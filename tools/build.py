@@ -6,6 +6,7 @@ import gzip
 import json
 import pathlib
 import re
+import time
 import unicodedata
 import urllib.request
 
@@ -70,8 +71,17 @@ def classifica(parametro, resultado):
 
 
 def baixa_json(url):
-    with urllib.request.urlopen(url, timeout=120) as resp:
-        bruto = resp.read()
+    # a API do IBGE às vezes não responde a partir dos runners do GitHub; tenta de novo como em fetch_sisagua
+    for tentativa in range(6):
+        try:
+            with urllib.request.urlopen(url, timeout=120) as resp:
+                bruto = resp.read()
+            break
+        except Exception as erro:
+            if tentativa == 5:
+                raise
+            print(f"  nova tentativa ({erro})")
+            time.sleep(10 * (tentativa + 1))
     # o IBGE responde em gzip mesmo sem o cliente pedir
     return json.loads(gzip.decompress(bruto) if bruto[:2] == b"\x1f\x8b" else bruto)
 
