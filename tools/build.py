@@ -1,14 +1,16 @@
-"""Trata os CSVs de data/raw, agrega por mês e gera site/index.html a partir de tools/template.html."""
+"""Trata os CSVs de data/historico e data/recente, agrega por mês e gera site/index.html a partir de tools/template.html."""
 import collections
 import csv
 import datetime as dt
+import gzip
 import json
 import pathlib
 import re
 import unicodedata
 
 RAIZ = pathlib.Path(__file__).resolve().parent.parent
-RAW = RAIZ / "data" / "raw"
+HISTORICO = RAIZ / "data" / "historico"
+RECENTE = RAIZ / "data" / "recente"
 PARAMS = {
     "Cloro residual livre (mg/L)": "cloro",
     "Turbidez (uT)": "turbidez",
@@ -90,7 +92,9 @@ def mapa_svg(codigos_ibge):
 
 
 def main():
-    arquivos = sorted(RAW.glob("vigilancia_al_*.csv"))
+    # logo depois da virada do ano, o mesmo ano pode estar nas duas pastas; vale o histórico
+    por_ano = {f.name: f for pasta in (RECENTE, HISTORICO) for f in pasta.glob("vigilancia_al_*.csv.gz")}
+    arquivos = [por_ano[nome] for nome in sorted(por_ano)]
     por_nome = {normaliza(m["nome"]): m for m in IBGE["municipios"]}
     csv.field_size_limit(10**7)
 
@@ -105,7 +109,7 @@ def main():
     total = 0
 
     for arquivo in arquivos:
-        with arquivo.open(encoding="utf-8", newline="") as f:
+        with gzip.open(arquivo, "rt", encoding="utf-8", newline="") as f:
             for r in csv.DictReader(f):
                 total += 1
                 anos[r["ano"]] += 1
@@ -150,7 +154,8 @@ def main():
                 c[2] += classe == "alto"
                 c[3] += classe == "alerta"
 
-    faltando = [a for a in range(ANO_INICIAL, hoje.year + 1) if str(a) not in anos]
+    # o ano corrente pode ainda não ter registros nos primeiros dias de janeiro
+    faltando = [a for a in range(ANO_INICIAL, hoje.year) if str(a) not in anos]
     if faltando or not celulas:
         raise SystemExit(f"Dados incompletos, faltam os anos {faltando}; site anterior mantido")
 
