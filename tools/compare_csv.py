@@ -1,5 +1,5 @@
 """Confere a API contra o CSV oficial do mesmo ano: uso: compare_csv.py <csv oficial> <ano>"""
-import collections, csv, sys
+import collections, csv, gzip, pathlib, sys
 sys.stdout.reconfigure(encoding="utf-8")
 csv.field_size_limit(10**7)
 oficial, ano = sys.argv[1], sys.argv[2]
@@ -11,7 +11,8 @@ with open(oficial, encoding="latin-1", newline="") as f:
             of[r["PARAMETRO"]] += 1
             chaves[(r["NU_AMOSTRA"], r["PARAMETRO"], r["DT_COLETA"][:10].replace("/", "-"), r["NO_MUNICIPIO"], r["RESULTADO"])] += 1
 api = collections.Counter(); ca = collections.Counter()
-for r in csv.DictReader(open(f"data/raw/vigilancia_al_{ano}.csv", encoding="utf-8")):
+nosso = next(p for p in (pathlib.Path("data", pasta, f"vigilancia_al_{ano}.csv.gz") for pasta in ("historico", "recente")) if p.exists())
+for r in csv.DictReader(gzip.open(nosso, "rt", encoding="utf-8", newline="")):
     api[r["parametro"]] += 1
     ca[(r["numero_da_amostra"], r["parametro"], r["data_da_coleta"][:10], r["municipio"], r["resultado"])] += 1
 for p in sorted(P):
