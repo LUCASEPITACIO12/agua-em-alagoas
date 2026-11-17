@@ -12,17 +12,24 @@ O painel mostra quatro parâmetros: cloro residual livre, turbidez, coliformes t
 
 ```mermaid
 flowchart LR
-    A[API do SISAGUA] -->|fetch_sisagua.py| B[data/raw/*.csv]
+    A[API do SISAGUA] -->|fetch_sisagua.py| R["data/recente: 2 anos mais recentes"]
+    H["data/historico: anos fechados"] --> D
     C[Arquivos do IBGE em tools/] --> D
-    B -->|build.py| D[site/index.html]
+    R -->|build.py| D[site/index.html]
     D -->|GitHub Actions| E[GitHub Pages]
 ```
 
-1. `tools/fetch_sisagua.py` baixa as amostras de Alagoas da API de dados abertos do Ministério da Saúde e grava um CSV por ano em `data/raw/`.
+1. `tools/fetch_sisagua.py` baixa as amostras de Alagoas da API de dados abertos do Ministério da Saúde e grava um CSV compactado por ano. Os anos fechados ficam guardados no repositório, em `data/historico/`, e não são baixados de novo. Os dois anos mais recentes vão para `data/recente/` e são baixados a cada atualização, porque o SISAGUA recebe registros com atraso.
 2. `tools/build.py` trata e agrega os dados por mês, cruza os municípios com o IBGE e gera um único arquivo, `site/index.html`, a partir de `tools/template.html`.
-3. O workflow [`atualizar.yml`](.github/workflows/atualizar.yml) faz os dois passos e publica o site no GitHub Pages **nos dias 1 e 16 de cada mês**, às 6h de Brasília.
+3. O workflow [`atualizar.yml`](.github/workflows/atualizar.yml) faz os dois passos e publica o site no GitHub Pages **nos dias 1 e 16 de cada mês**, às 6h de Brasília. Cada atualização leva cerca de 10 minutos.
+4. No fim, o workflow faz um commit com a data da atualização em `data/ultima_atualizacao.txt`, as linhas por ano em `data/contagens.json` e, na virada do ano, o ano que fechou em `data/historico/`. Esse commit também evita que o GitHub desligue o agendamento por falta de atividade no repositório.
 
-Se a API falhar ou faltar algum ano, o build para e o site anterior continua no ar.
+Se a API falhar ou faltar algum ano, o build para e o site anterior continua no ar. O download também para, sem gravar nada, em dois casos que indicam mudança na API, e não nos dados:
+
+- Um ano vem com mais de 10% menos linhas do que na atualização anterior, registrada em `data/contagens.json`. Se a queda for real, apague esse arquivo e rode o workflow de novo.
+- As páginas da API se repetem. Em novembro de 2026, a API passou a tratar o parâmetro `offset` como número da página, e não da linha; o download segue página por página até receber uma vazia.
+
+Para baixar de novo também os anos antigos, por exemplo se o Ministério revisar dados passados, rode o workflow manualmente em **Actions > Atualizar painel > Run workflow** e marque **Baixar de novo também os anos antigos**. Essa execução leva cerca de 40 minutos.
 
 ## Estrutura do repositório
 
@@ -32,14 +39,13 @@ Se a API falhar ou faltar algum ano, o build para e o site anterior continua no 
 | `tools/build.py` | Trata os dados e gera o site |
 | `tools/template.html` | Modelo da página (HTML, CSS e JavaScript) |
 | `tools/compare_csv.py` | Confere a API contra o CSV oficial de um ano |
-| `tools/municipios.json` | Lista dos municípios de Alagoas, do IBGE |
-| `tools/27` | Malha (limites) dos municípios de Alagoas, do IBGE, em GeoJSON |
+| `tools/ibge_al.json` | Lista e malha (limites) dos municípios de Alagoas, do IBGE |
+| `data/historico/` | Amostras dos anos fechados, um arquivo `.csv.gz` por ano |
+| `data/contagens.json` | Linhas por ano na última atualização, para conferir o download seguinte |
+| `data/ultima_atualizacao.txt` | Data da última atualização automática |
 | `.github/workflows/atualizar.yml` | Atualização e publicação automáticas |
 
-A API do IBGE não responde aos servidores do GitHub, então os dois arquivos do IBGE ficam salvos no repositório. Se eles forem apagados, o build tenta baixá-los e falha no GitHub Actions. Para atualizá-los, baixe de novo pelos links abaixo e substitua os arquivos com os mesmos nomes:
-
-- [Lista de municípios](https://servicodados.ibge.gov.br/api/v1/localidades/estados/27/municipios) → `tools/municipios.json`
-- [Malha dos municípios](https://servicodados.ibge.gov.br/api/v3/malhas/estados/27?intrarregiao=municipio&qualidade=minima&formato=application/vnd.geo%2Bjson) → `tools/27`
+A API do IBGE não responde aos servidores do GitHub, então a lista e a malha dos municípios ficam salvas em `tools/ibge_al.json`. Se esse arquivo for apagado, o build falha.
 
 ## Gerar localmente
 
@@ -55,11 +61,13 @@ python tools/build.py
 
 Depois, abra `site/index.html` no navegador.
 
-O primeiro download leva de 30 a 50 minutos. Nas vezes seguintes, só os dois anos mais recentes são baixados de novo, porque o SISAGUA recebe registros com atraso. Use `python tools/fetch_sisagua.py --all` para baixar tudo outra vez.
+Com os anos fechados já em `data/historico/`, o download leva cerca de 10 minutos, porque só os dois anos mais recentes são baixados. Use `python tools/fetch_sisagua.py --all` para baixar tudo outra vez, o que leva de 30 a 50 minutos.
 
 ## Fonte e tratamento dos dados
 
 **Fonte:** API [`apidadosabertos.saude.gov.br/sisagua/vigilancia-parametros-basicos`](https://apidadosabertos.saude.gov.br/sisagua/vigilancia-parametros-basicos), com 1.000 linhas por página. Para 2018, as contagens e as chaves das amostras bateram integralmente com o CSV oficial (verificado com `tools/compare_csv.py`).
+
+Os arquivos de `data/historico/` e `data/recente/` guardam só as colunas usadas pelo painel e algumas de identificação, como município, forma de abastecimento e ponto de coleta. Endereço, coordenadas e campos de texto livre ficam de fora, porque o repositório é público. Quem precisar deles pode consultar a fonte oficial.
 
 ### Critérios (Portaria GM/MS nº 888/2021)
 
