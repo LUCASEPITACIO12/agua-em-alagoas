@@ -4,11 +4,20 @@ on:
   schedule:
     - cron: "0 9 1,16 * *" # dias 1 e 16, 6h em Brasília
   workflow_dispatch:
+    inputs:
+      tudo:
+        description: "Baixar de novo também os anos antigos (leva cerca de 40 min)"
+        type: boolean
+        default: false
 
 permissions:
-  contents: read
+  contents: write # para guardar os dados no repositório
   pages: write
   id-token: write
+
+concurrency:
+  group: atualizar-painel
+  cancel-in-progress: false
 
 jobs:
   atualizar:
@@ -19,11 +28,28 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.13"
-      # baixa tudo porque o SISAGUA também revisa anos anteriores;
+      # os anos fechados já estão em data/historico; baixa só os dois mais recentes,
+      # a não ser que a execução manual peça tudo
+      - name: Baixar dados do SISAGUA
+        run: python tools/fetch_sisagua.py ${{ inputs.tudo && '--all' || '' }}
       # se a API ou a checagem falharem, o site publicado continua o anterior
-      - run: python tools/fetch_sisagua.py --all
-      - run: python tools/build.py
+      - name: Gerar o painel
+        id: gerar
+        run: python tools/build.py
       - uses: actions/upload-pages-artifact@v3
         with:
           path: site
       - uses: actions/deploy-pages@v4
+      # guarda os anos que acabaram de fechar, as linhas por ano (para a próxima conferência)
+      # e a data desta atualização; o commit também conta como atividade, e assim o GitHub
+      # não desliga o agendamento por inatividade
+      - name: Guardar dados no repositório
+        if: always() && steps.gerar.outcome == 'success'
+        run: |
+          TZ=America/Sao_Paulo date +"Última atualização: %d/%m/%Y %H:%M (Brasília)" > data/ultima_atualizacao.txt
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/historico data/contagens.json data/ultima_atualizacao.txt
+          git commit -m "Atualiza dados do painel"
+          git pull --rebase origin "$GITHUB_REF_NAME"
+          git push origin "HEAD:$GITHUB_REF_NAME"
